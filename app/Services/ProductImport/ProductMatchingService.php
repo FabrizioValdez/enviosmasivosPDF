@@ -275,6 +275,8 @@ class ProductMatchingService
         $text = preg_replace('/\s+/', ' ', $text);
         $text = trim($text);
 
+        $text = $this->normalizeText($text);
+
         $words = explode(' ', $text);
         $keywords = [];
 
@@ -302,15 +304,28 @@ class ProductMatchingService
     {
         $word = strtolower(trim($word));
 
+        $word = preg_replace('/grado|grade/', 'gr', $word);
+        $word = preg_replace('/gr\d+$/', 'gr', $word);
         $word = preg_replace('/corrugad[ao]/', 'corrugad', $word);
+        $word = preg_replace('/construccion|construcci[oó]n/', 'corrugad', $word);
         $word = preg_replace('/acero|fierro/', 'acero', $word);
         $word = preg_replace('/inoxidable|inox/', 'inox', $word);
-        $word = preg_replace('/grado|grade/', 'gr', $word);
         $word = preg_replace('/pulgada|pulgadas/', 'in', $word);
         $word = preg_replace('/metro|metros/', 'm', $word);
         $word = preg_replace('/kilo|kilos/', 'kg', $word);
 
         return $word;
+    }
+
+    private function normalizeText(string $text): string
+    {
+        $text = preg_replace('/\b(grado|grade)\s*(\d+)\b/i', 'gr $2', $text);
+        $text = preg_replace('/\bgr(\d+)\b/i', 'gr $1', $text);
+
+        $text = preg_replace('/([a-zA-Z])\/([a-zA-Z])/', '$1 $2', $text);
+        $text = preg_replace('/(\d)\/([a-zA-Z])/', '$1 $2', $text);
+
+        return $text;
     }
 
     private function normalizeSpec(string $spec): string

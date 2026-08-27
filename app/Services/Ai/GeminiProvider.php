@@ -146,19 +146,40 @@ class GeminiProvider implements AiProviderInterface
         ];
 
         try {
-            $response = Http::withHeaders([
-                'Content-Type' => 'application/json',
-            ])->timeout(120)->post(
-                "https://generativelanguage.googleapis.com/v1beta/models/{$this->model}:generateContent?key={$this->apiKey}",
-                $payload
-            );
+            $maxRetries = 3;
+            $attempt = 0;
 
-            if ($response->failed()) {
-                Log::error('Gemini API error', [
-                    'status' => $response->status(),
-                    'body' => $response->body(),
+            while (true) {
+                $attempt++;
+                $response = Http::withHeaders([
+                    'Content-Type' => 'application/json',
+                ])->timeout(120)->post(
+                    "https://generativelanguage.googleapis.com/v1beta/models/{$this->model}:generateContent?key={$this->apiKey}",
+                    $payload
+                );
+
+                if ($response->successful()) {
+                    break;
+                }
+
+                $status = $response->status();
+                $retryable = in_array($status, [429, 503]);
+
+                Log::warning('Gemini API response', [
+                    'status' => $status,
+                    'attempt' => $attempt,
+                    'retryable' => $retryable,
+                    'body' => substr($response->body(), 0, 300),
                 ]);
-                throw new Exception("Gemini API error: {$response->status()}");
+
+                if ($retryable && $attempt < $maxRetries) {
+                    $delay = (int) pow(2, $attempt) * 3;
+                    Log::info("Retrying in {$delay}s", ['attempt' => $attempt]);
+                    sleep($delay);
+                    continue;
+                }
+
+                throw new Exception("Gemini API error: {$status}");
             }
 
             $result = $response->json();
